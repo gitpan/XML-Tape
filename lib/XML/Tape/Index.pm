@@ -1,5 +1,5 @@
 #
-# $Id: Index.pm,v 1.3 2005/06/29 15:33:03 patrick Exp $
+# $Id: Index.pm,v 1.4 2005/08/04 15:00:04 patrick Exp $
 #
 
 =head1 NAME
@@ -44,7 +44,7 @@ use Digest::MD5 qw(md5);
 require Exporter;
 use vars qw($VERSION);
 
-( $VERSION ) = '$Revision: 1.3 $ ' =~ /\$Revision:\s+([^\s]+)/;;
+( $VERSION ) = '$Revision: 1.4 $ ' =~ /\$Revision:\s+([^\s]+)/;;
 
 @XML::Tape::Index::ISA = qw(Exporter);
 @XML::Tape::Index::EXPORT_OK = qw(indexopen indexexists indexdrop);
@@ -134,6 +134,7 @@ sub reindex {
     my $tape = XML::Tape::tapeopen($this->{tape_file}, 'r') || return undef;
 
     my $_start = time();
+    my $earliest_datestamp = undef;
     while (my $record = $tape->get_record()) {
         $num_of_rec++;
         my $id     = $record->getIdentifier();
@@ -149,11 +150,18 @@ sub reindex {
             my $speed = int($num_of_rec/(time - $_start + 1));
             print "record: $num_of_rec ($speed r/s) read: " . $record->getEndByte() . " bytes\n";
         }
+
+        my $comp_date = $date; $comp_date =~ s/\D+//g;
+        if ( ! defined $earliest_datestamp || $earliest_datestamp->{val} > $comp_date ) {
+            $earliest_datestamp->{val} = $comp_date;
+            $earliest_datestamp->{str} = $date;
+        }
     }
     $tape->tapeclose();
 
     $this->{admh}->put('tapefile', $this->{tape_file});
     $this->{admh}->put('recnum', $num_of_rec);
+    $this->{admh}->put('earliest', $earliest_datestamp->{str});
 
     return $num_of_rec;
 }
@@ -242,6 +250,42 @@ sub list_identifiers {
         'length'       => $field[3] ,
         'token'        => $field[1] . "," . unpack("H*",$md5)
     };
+}
+
+=item $x->get_earlist_date()
+
+This methods returns earliest date in the index file
+
+=cut
+sub get_earliest_date {
+    my ($this, $id) = @_;
+    my $values;
+    $this->{admh}->get('earliest',$values);
+    return $values;
+}
+
+=item $x->get_tape_file()
+
+This methods returns name of the tape file associated with this index.
+
+=cut
+sub get_tape_file {
+    my ($this, $id) = @_;
+    my $values;
+    $this->{admh}->get('tapefile',$values);
+    return $values;
+}
+
+=item $x->get_num_of_records()
+
+This methods returns the number of record in an index.
+
+=cut
+sub get_num_of_records {
+    my ($this, $id) = @_;
+    my $values;
+    $this->{admh}->get('recnum',$values);
+    return $values;
 }
 
 =item $x->get_identifier($identifier)

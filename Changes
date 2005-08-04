@@ -1,2 +1,9 @@
+0.10 Thu Aug  4 13:43:03 CEST 2005
+    - added example index file to the ex directory
+    - added example OAI-PMH interface on XML::Tape using HTTP::OAI
+    - added get_record_num, get_tape_file, get_earliest_date 
+      methods to XML::Tape::Index
+    - added oaitape script
+
 0.01 Wed Jun  8 13:35:24 CEST 2005
     - original version

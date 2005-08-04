@@ -1,10 +1,10 @@
 #
-# $Id: Makefile.PL,v 1.5 2005/06/08 11:28:53 patrick Exp $
+# $Id: Makefile.PL,v 1.6 2005/08/04 15:00:02 patrick Exp $
 #
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    'VERSION'   => '0.01' ,
+    'VERSION'   => '0.10' ,
     'AUTHOR'    => 'Patrick Hochstenbach <Patrick.Hochstenbach@UGent.be>' ,
     'NAME'      => 'XML::Tape' ,
     'PMLIBDIRS' => [ 'lib' ] ,
@@ -16,5 +16,8 @@ WriteMakefile(
         IO::File => 0,
         XML::Parser => 0,
         Test::More => 0,
+	XML::LibXML => 0,
+	HTTP::OAI => 0,
+	XML::SAX::Writer => 0,
     }
 );

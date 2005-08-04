@@ -1,5 +1,5 @@
 # 
-# $Id: Tape.pm,v 1.4 2005/06/29 15:33:03 patrick Exp $
+# $Id: Tape.pm,v 1.5 2005/08/04 15:00:04 patrick Exp $
 #
 
 =head1 NAME
@@ -37,7 +37,7 @@ use strict;
 require Exporter;
 use vars qw($VERSION);
 
-( $VERSION ) = '$Revision: 1.4 $ ' =~ /\$Revision:\s+([^\s]+)/;;
+( $VERSION ) = '$Revision: 1.5 $ ' =~ /\$Revision:\s+([^\s]+)/;;
 
 @XML::Tape::ISA = qw(Exporter);
 @XML::Tape::EXPORT_OK = qw(tapeopen);
@@ -609,6 +609,12 @@ XMLtape archives were developed by the Digital Library Research & Prototyping
 team at Los Alamos National Laboratory.
 
 XML parsing in the module was inspired by Robert Hanson's XML::RAX module.
+
+=head1 SEE ALSO
+
+L<XML::Tape::Index>
+
+In bin/oaitape you'll find an example of a OAI-PMH interface on XML::Tape
 
 =head1 AUTHOR
 
