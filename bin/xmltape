@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Id: xmltape,v 1.1.1.1 2005/06/08 09:29:13 patrick Exp $
+# $Id: xmltape,v 1.2 2005/09/01 08:19:27 patrick Exp $
 #
 # Patrick Hochstenbach <Patrick.Hochstenbach@UGent.be>
 #
@@ -58,7 +58,7 @@ sub createArchive {
         die "can't stat `$f': $!" unless ($#stat > 0);
         my $f_id    = $f;
         my $f_date  = strftime "%Y-%m-%dT%H:%M:%SZ" , gmtime $stat[9]; 
-        $tape->add_record( $f_id, $f_date, &readFile($f), $f_admin);
+        $tape->add_record( $f_id, $f_date, &readFile($f));
         print STDERR "$f_id\n" if $verbose;
     }
 

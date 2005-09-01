@@ -1,5 +1,5 @@
 # 
-# $Id: Tape.pm,v 1.5 2005/08/04 15:00:04 patrick Exp $
+# $Id: Tape.pm,v 1.7 2005/09/01 08:19:27 patrick Exp $
 #
 
 =head1 NAME
@@ -37,12 +37,12 @@ use strict;
 require Exporter;
 use vars qw($VERSION);
 
-( $VERSION ) = '$Revision: 1.5 $ ' =~ /\$Revision:\s+([^\s]+)/;;
+( $VERSION ) = '$Revision: 1.7 $ ' =~ /\$Revision:\s+([^\s]+)/;;
 
 @XML::Tape::ISA = qw(Exporter);
 @XML::Tape::EXPORT_OK = qw(tapeopen);
 %XML::Tape::EXPORT_TAGS = (all => [qw(tapeopen)]);
-$XML::Tape::SCHEMA_LOCATION = 'http://purl.lanl.gov/STB-RL/schemas/2005-01/tape.xsd';
+$XML::Tape::SCHEMA_LOCATION = 'http://purl.lanl.gov/aDORe/schemas/2005-08/XMLtape.xsd';
 
 =head1 FUNCTIONS
 
@@ -75,7 +75,17 @@ sub tapeopen {
         return new XML::Tape::Writer($filename,@admin);
     }
     else {
-        return new XML::Tape::Reader($filename);
+        my $identifier = new XML::Tape::Identifier;
+        my $namespace = $identifier->identify($filename);
+        if ($namespace eq 'http://library.lanl.gov/2005-01/STB-RL/tape/') {
+            return new XML::Tape::Reader::v2005_01($filename);
+        }
+        elsif ($namespace eq 'http://library.lanl.gov/2005-08/aDORe/XMLtape/') {
+            return new XML::Tape::Reader($filename);
+        }
+        else {
+            die "unknown tape version $namespace";
+        }
     }
 
     return undef;
@@ -110,7 +120,7 @@ sub init {
     my $fh = $this->{fh};
     die "init: not allowed at this stage" unless $this->{init} == 0;
     print $fh "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    print $fh "<tape xmlns=\"http://library.lanl.gov/2005-01/STB-RL/tape/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://library.lanl.gov/2005-01/STB-RL/tape/ $XML::Tape::SCHEMA_LOCATION\">";
+    print $fh "<tape xmlns=\"http://library.lanl.gov/2005-08/aDORe/XMLtape/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://library.lanl.gov/2005-08/aDORe/XMLtape/ $XML::Tape::SCHEMA_LOCATION\">";
     $this->{init}++;
 }
 
@@ -120,7 +130,7 @@ sub add_admin {
     $this->init() unless ($this->{init});
     die "add_admin: not allowed at this stage" unless $this->{recnum} == 0;
     foreach (@admin) {
-        printf $fh "<tape-admin>%s</tape-admin>", $_;
+        printf $fh "<tapeAdmin>%s</tapeAdmin>", $_;
     }
 }
 
@@ -139,16 +149,16 @@ sub add_record {
     my $fh = $this->{fh};
     $this->init() unless ($this->{init});
 
-    print $fh "<tape-record>";
-    print $fh "<tape-record-admin>";
+    print $fh "<tapeRecord>";
+    print $fh "<tapeRecordAdmin>";
     print $fh "<identifier>" , &escape($identifier) , "</identifier>";
     print $fh "<date>" ,  &escape($date) , "</date>";
     foreach my $admin (@admin) {
-        print $fh "<record-admin>" , $admin , "</record-admin>";
+        print $fh "<recordAdmin>" , $admin , "</recordAdmin>";
     }
-    print $fh "</tape-record-admin>";
+    print $fh "</tapeRecordAdmin>";
     print $fh "<record>" , $record , "</record>";
-    print $fh "</tape-record>";
+    print $fh "</tapeRecord>";
 
     $this->{recnum}++;
 
@@ -180,7 +190,34 @@ sub escape {
     return $str;
 }
 
+package XML::Tape::Identifier;
+use XML::Parser;
+
+sub new {
+    my $pkg = shift;
+    return bless {} , $pkg;
+}
+
+sub identify {
+    my ($this,$filename) = @_;
+    my $parser = new XML::Parser(Namespaces => 1,
+                                 Handlers => {
+                                    Start      => sub { $this->handle_start(@_); },
+                                 });
+    eval {
+        $parser->parsefile($filename);
+    };
+    return $this->{namespace};
+}
+
+sub handle_start {
+    my ($this, $xp, $elem, %attr) = @_;
+    $this->{namespace} = $xp->namespace($elem);
+    die "ok";
+}
+
 package XML::Tape::Reader;
+# NS version http://library.lanl.gov/2005-08/aDORe/XMLtape/
 use XML::Parser;
 use IO::File;
 
@@ -282,6 +319,261 @@ sub parse {
         # Read a chunk of XML...
         read($this->{fh}, $buffer, $XML::Tape::Reader::BUFF_SIZE);
      
+        # If the buffer isn't empty then, parse it
+        # otherwise we reached the end of the file...
+        if (length $buffer) {
+            $this->{parsernb}->parse_more($buffer);
+        }
+        else {
+            $this->{parsernb}->parse_done();
+            $this->{parse_done} = 1;
+        }
+    }
+}
+
+sub handle_start {
+    my ($this, $xp, $elem, %attr) = @_;
+
+    if (0) {}
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+
+    if (0) {}
+    elsif ($xp->depth == 1 && $elem =~ /^(\w+:)?tapeAdmin$/) {
+        $this->{nav}->{in_tape_admin} = 1;
+        $this->{curr} = XML::Tape::Admin->new();
+    }
+    elsif ($xp->depth == 1 && $elem =~ /^(\w+:)?tapeRecord$/) {
+        $this->{curr} = XML::Tape::Record->new();
+    }
+    elsif ($xp->depth == 2 && $elem =~ /^(\w+:)?tapeRecordAdmin$/) {
+        $this->{nav}->{in_tape_record_admin} = 1;
+    }
+    elsif ($this->{nav}->{in_tape_record_admin} == 1 && $elem =~ /^(\w+:)?identifier$/) {
+        $this->{nav}->{in_record_identifier} = 1;
+    }
+    elsif ($this->{nav}->{in_tape_record_admin} == 1 && $elem =~ /^(\w+:)?date$/) {
+        $this->{nav}->{in_record_date} = 1;
+    }
+    elsif ($this->{nav}->{in_tape_record_admin} == 1 && $elem =~ /^(\w+:)?recordAdmin$/) {
+        $this->{nav}->{in_record_admin} = 1;
+        $this->{curr}->pushAdmin();
+    }
+    elsif ($xp->depth == 2 && $elem =~ /^(\w+:)?record$/) {
+        $this->{nav}->{in_record} = 1;
+        $this->{curr}->setStartByte($xp->current_byte + length $xp->original_string);
+    }
+}
+
+sub handle_end {
+    my ($this, $xp, $elem, %attr) = @_;
+
+    if (0) {}
+    elsif ($xp->depth == 1 && $elem =~ /^(\w+:)?tapeAdmin$/) {
+        $this->{nav}->{in_tape_admin} = 0;
+        push(@{$this->{admins}}, $this->{curr});
+    }
+    elsif ($xp->depth == 1 && $elem =~ /^(\w+:)?tapeRecord$/) {
+        push(@{$this->{records}}, $this->{curr});
+    }
+    elsif ($xp->depth == 2 && $elem =~ /^(\w+:)?tapeRecordAdmin$/) {
+        $this->{nav}->{in_tape_record_admin} = 0;
+    }
+    elsif ($this->{nav}->{in_tape_record_admin} == 1 && $elem =~ /^(\w+:)?identifier$/) {
+        $this->{nav}->{in_record_identifier} = 0;
+    }
+    elsif ($this->{nav}->{in_tape_record_admin} == 1 && $elem =~ /^(\w+:)?date$/) {
+        $this->{nav}->{in_record_date} = 0;
+    }
+    elsif ($this->{nav}->{in_tape_record_admin} == 1 && $elem =~ /^(\w+:)?recordAdmin$/) {
+        $this->{nav}->{in_record_admin} = 0;
+    }
+    elsif ($xp->depth == 2 && $elem =~ /^(\w+:)?record$/) {
+        $this->{nav}->{in_record} = 0;
+        $this->{curr}->setEndByte($xp->current_byte);
+    }
+
+    if (0) {}
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+}
+
+sub handle_char {
+    my ($this, $xp, $data) = @_;
+
+    if (0) {}
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record_identifier}) {
+        $this->{curr}->addIdentifier($data);
+    }
+    elsif ($this->{nav}->{in_record_date}) {
+        $this->{curr}->addDate($data);
+    }
+}
+
+sub handle_comment {
+    my ($this, $xp, $data) = @_;
+
+    if (0) {}
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+}
+
+sub handle_proc {
+    my ($this, $xp) = @_;
+
+    if (0) {}
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+}
+
+sub handle_cdata_start {
+    my ($this, $xp) = @_;
+
+    if (0) {}
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+}
+
+sub handle_cdata_end {
+    my ($this, $xp) = @_;
+
+    if (0) {}
+    elsif ($this->{nav}->{in_tape_admin}) {
+        $this->{curr}->addAdminXML($xp->original_string);
+    }
+    elsif ($this->{nav}->{in_record}) {
+        $this->{curr}->addRecordXML($xp->original_string);
+    }
+}
+
+sub handle_final {
+    return 1;
+}
+
+package XML::Tape::Reader::v2005_01;
+# Old tape reader keeping for backwards compatibility reasons;
+# NS version http://library.lanl.gov/2005-01/STB-RL/tape/
+use XML::Parser;
+use IO::File;
+
+$XML::Tape::Reader::BUFF_SIZE = 1024;
+
+sub new {
+    my ($pkg, $filename,%options) = @_;
+    my $obj = bless {} , $pkg;
+    my $fh;
+
+    if (ref $filename && $filename->isa('Tie::Handle')) {
+        $fh = $filename;
+    }
+    else {
+        $fh = new IO::File;
+        $fh->open("< $filename") || return undef;
+    }
+
+    $obj->{fh}             = $fh;   # XML file handle
+    $obj->{records}        = [];    # Temporary storage for XML::Tape::Record
+    $obj->{admins}         = [];    # Temporary storage for XML::Tape::Admin
+    $obj->{curr}           = undef; # Current record to be read
+    $obj->{parse_init}     = 0;     # Flag to indicate if we started reading XML
+    $obj->{parse_done}     = 0;     # Flag to indicate if we still reading XML
+    $obj->{parser}         = undef; # XML::Parser
+    $obj->{parsernb}       = undef; # XML::Parser::ExpatNB
+    $obj->{nav}            = {};    # Hash to navigate in the XML record
+
+    return $obj;
+}
+
+sub get_admin {
+    my ($this) = shift;
+
+    $this->parse() until ( ( scalar @{$this->{records}} ) || ( $this->{parse_done} ) );
+
+    return shift( @{$this->{admins}} );
+}
+
+sub get_record {
+    my ($this) = shift;
+
+    # Parse the XML until we read a new record or the parse is done...
+    $this->parse() until ( ( scalar @{$this->{records}} ) || ( $this->{parse_done} ) );
+
+    return shift( @{$this->{records}} );
+}
+
+sub tapeclose {
+    my ($this) = shift;
+    $this->{fh}->close;
+}
+
+sub parse_init {
+    my ($this) = shift;
+
+    $this->{parser} = new XML::Parser( Handlers => {
+                    Start      => sub { $this->handle_start(@_); },
+                    Char       => sub { $this->handle_char(@_); },
+                    Comment    => sub { $this->handle_comment(@_); },
+                    Proc       => sub { $this->handle_proc(@_); },
+                    CdataStart => sub { $this->handle_cdata_start(@_); },
+                    CdataEnd   => sub { $this->handle_cdata_end(@_); },
+                    End        => sub { $this->handle_end(@_); },
+                    Final      => sub { $this->handle_final(@_); },
+                      });
+
+    $this->{parsernb} = $this->{parser}->parse_start();
+
+    return undef unless $this->{parsernb};
+
+    $this->{parse_init} = 1;
+
+    return 1;
+}
+
+sub parse {
+    my ($this) = shift;
+
+    unless ($this->{parse_init}) {
+        $this->parse_init() || return undef;
+    }
+
+    if (defined $this->{fh}) {
+        my $buffer;
+
+        # Read a chunk of XML...
+        read($this->{fh}, $buffer, $XML::Tape::Reader::BUFF_SIZE);
+
         # If the buffer isn't empty then, parse it
         # otherwise we reached the end of the file...
         if (length $buffer) {
@@ -444,6 +736,7 @@ sub handle_cdata_end {
 sub handle_final {
     return 1;
 }
+
 
 =back
 

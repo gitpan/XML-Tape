@@ -1,5 +1,5 @@
 #
-# $Id: Index.pm,v 1.4 2005/08/04 15:00:04 patrick Exp $
+# $Id: Index.pm,v 1.5 2005/09/01 08:19:27 patrick Exp $
 #
 
 =head1 NAME
@@ -44,7 +44,7 @@ use Digest::MD5 qw(md5);
 require Exporter;
 use vars qw($VERSION);
 
-( $VERSION ) = '$Revision: 1.4 $ ' =~ /\$Revision:\s+([^\s]+)/;;
+( $VERSION ) = '$Revision: 1.5 $ ' =~ /\$Revision:\s+([^\s]+)/;;
 
 @XML::Tape::Index::ISA = qw(Exporter);
 @XML::Tape::Index::EXPORT_OK = qw(indexopen indexexists indexdrop);
@@ -305,6 +305,8 @@ sub get_identifier {
 
     $this->{rech}->get($md5,$values);
 
+    return undef unless $values;
+
     my (@field) = split(/\t/,$values);
     return {
         'identifier'   => $field[0] ,
@@ -327,7 +329,9 @@ sub get_record {
 
     local(*F);
     my $rec = $this->get_identifier($id);
-    
+   
+    return undef unless $rec;
+
     my $xml;
     if ($rec->{start} && $rec->{len}) {
         open(F, $this->{tape_file}) || return undef;

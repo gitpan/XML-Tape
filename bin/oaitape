@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Id: oaitape,v 1.1 2005/08/04 15:00:03 patrick Exp $
+# $Id: oaitape,v 1.3 2005/09/01 08:19:27 patrick Exp $
 #
 # An example OAI interface on XML tapes
 #
@@ -57,6 +57,15 @@ elsif ($verb eq 'Identify') {
              );
 }
 elsif ($verb eq 'ListMetadataFormats') {
+    my $identifier     = $attr{identifier};
+
+    if ($identifier) {
+        my $rec = $index->get_identifier($identifier);
+
+        &oaiError(new HTTP::OAI::Error(code=>'idDoesNotExist')) 
+                        unless $rec;
+    }
+
     $resp = new HTTP::OAI::ListMetadataFormats;
     foreach my $mdf (@metadata_formats) {
         $resp->metadataFormat($mdf);
@@ -84,7 +93,7 @@ elsif ($verb eq 'ListIdentifiers') {
 
     my $cnt = 0;
     my $new_token = undef;
-    for (my $rec = $index->list_identifiers($token ? $resumptionToken : $from,$until) ;
+    for (my $rec = $index->list_identifiers(length $token ? $token : ($from,$until)) ;
          defined($rec) ;
          $rec = $index->list_identifiers($rec->{token}) ) {
 
@@ -130,7 +139,7 @@ elsif ($verb eq 'ListRecords') {
 
     my $cnt = 0;
     my $new_token = undef;
-    for (my $rec = $index->list_identifiers($token ? $resumptionToken : $from,$until) ;
+    for (my $rec = $index->list_identifiers(length $token ? $token : ($from,$until)) ;
          defined($rec) ;
          $rec = $index->list_identifiers($rec->{token}) ) {
 
@@ -181,6 +190,10 @@ elsif ($verb eq 'GetRecord') {
                    );
 
     my $xml = $index->get_record($rec->{identifier});
+
+    &oaiError(new HTTP::OAI::Error(code=>'idDoesNotExist')) 
+                        unless $xml;
+
     my $dom = XML::LibXML->new->parse_string($xml);
 
     my $metadata = new HTTP::OAI::Metadata(dom => $dom);
