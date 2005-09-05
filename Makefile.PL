@@ -4,7 +4,7 @@
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    'VERSION'   => '0.21' ,
+    'VERSION'   => '0.22' ,
     'AUTHOR'    => 'Patrick Hochstenbach <Patrick.Hochstenbach@UGent.be>' ,
     'NAME'      => 'XML::Tape' ,
     'PMLIBDIRS' => [ 'lib' ] ,

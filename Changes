@@ -1,3 +1,7 @@
+0.22 Mon Sep  5 10:46:56 CEST 2005
+    - fixed bugs in oaitape to return correct ListMetadataFormats
+      responses
+
 0.21 Thu Sep  1 10:18:35 CEST 2005
     - fixed a bugs in the oaitape and XML::Tape::Index
       on searching for non existing identifiers

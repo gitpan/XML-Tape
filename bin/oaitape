@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# $Id: oaitape,v 1.3 2005/09/01 08:19:27 patrick Exp $
+# $Id: oaitape,v 1.5 2005/09/05 08:47:34 patrick Exp $
 #
 # An example OAI interface on XML tapes
 #
@@ -10,7 +10,7 @@ use HTTP::OAI;
 use HTTP::OAI::Repository qw/:validate/;
 use XML::SAX::Writer;
 use XML::Tape::Index qw(:all);
-use CGI qw/:standard/;
+use CGI qw/:standard -oldstyle_urls/;
 
 #--local-configuration--------------------------------
 my $base_url         = "http://yourhost/cgi/oai";
@@ -21,7 +21,7 @@ my @metadata_formats = (
     new HTTP::OAI::MetadataFormat(
      metadataPrefix => 'didl' , 
      schema => 'http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-21_schema_files/did/didl.xsd' , 
-     namespace => 'urn:mpeg:mpeg21:2002:02-DIDL-NS'
+     metadataNamespace => 'urn:mpeg:mpeg21:2002:02-DIDL-NS'
      )
    );
 my $max_num_record   = 2;
